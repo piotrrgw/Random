@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generator Kodów v1.3</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #f4f4f4;
+            --text-color: #1a1a1a;
+            --container-bg: #ffffff;
+            --btn-color: #005a9e;
+            --btn-hover: #004a80;
+            --error-color: #d93025;
+            --focus-ring: #ffbf00;
+            --border-color: #ccc;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+
+        .container {
+            background-color: var(--container-bg);
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+        }
+
+        h1 {
+            margin-top: 0;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        /* --- STYLIZACJA RADIO BUTTONÓW --- */
+        fieldset {
+            border: none;
+            padding: 0;
+            margin: 0 0 1.5rem 0;
+            text-align: left;
+        }
+
+        legend {
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+
+        .radio-option {
+            display: block;
+            margin-bottom: 0.5rem;
+            position: relative;
+        }
+
+        /* Ukrywamy domyślne kropki radio, żeby zrobić własne style */
+        .radio-option input[type="radio"] {
+            opacity: 0;
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+            z-index: 2;
+        }
+
+        /* Wygląd "karty" dla opcji */
+        .radio-label {
+            display: block;
+            padding: 12px 15px;
+            background: #fff;
+            border: 2px solid var(--border-color);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        /* Stan zaznaczenia */
+        .radio-option input[type="radio"]:checked + .radio-label {
+            border-color: var(--btn-color);
+            background-color: #eef6fc;
+            color: var(--btn-color);
+            font-weight: bold;
+        }
+
+        /* Stan focus (dla klawiatury) */
+        .radio-option input[type="radio"]:focus + .radio-label {
+            outline: 3px solid var(--focus-ring);
+        }
+
+        /* --- POLE "WŁASNA" (domyślnie ukryte) --- */
+        #custom-input-container {
+            display: none; /* Ukryte domyślnie */
+            margin-top: 0.5rem;
+            padding-left: 1.5rem;
+            border-left: 3px solid var(--btn-color);
+        }
+
+        #custom-input-container.visible {
+            display: block;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 0.8rem;
+            font-size: 1.1rem;
+            border: 2px solid var(--border-color);
+            border-radius: 4px;
+            box-sizing: border-box;
+            text-transform: uppercase;
+        }
+
+        #status-message {
+            min-height: 1.5rem;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: var(--error-color);
+        }
+
+        #barcode-container {
+            margin: 1rem 0;
+            min-height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #ddd;
+            background: #fff;
+            padding: 10px;
+        }
+
+        svg { max-width: 100%; height: auto; }
+
+        button {
+            background-color: var(--btn-color);
+            color: #ffffff;
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1.1rem;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            min-height: 48px;
+        }
+
+        button:hover { background-color: var(--btn-hover); }
+        button:focus { outline: 3px solid var(--focus-ring); }
+
+        #human-readable {
+            font-size: 1.4rem;
+            font-weight: bold;
+            font-family: monospace;
+            letter-spacing: 2px;
+            margin-top: 5px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <main class="container">
+        <h1>Generator Kodu v1.3</h1>
+
+        <fieldset>
+            <legend>Wybierz serię:</legend>
+            
+            <div id="radio-container">
+                </div>
+        </fieldset>
+
+        <div id="status-message" aria-live="polite"></div>
+
+        <div id="barcode-container" role="img" aria-label="Kod kreskowy">
+            <svg id="barcode"></svg>
+        </div>
+        <div id="human-readable"></div>
+
+        <button onclick="handleGenerate()">Generuj Kod</button>
+    </main>
+
+    <script>
+        // Version: 1.3
+        
+        // --- BAZA DANYCH ---
+        const seriesData = {
+            "descriptions": {
+                "IA": "ŁKA"
+                // Tu dodajesz kolejne dozwolone serie, np. "XY": "Opis"
+            },
+            "blocked": [
+                "DB", "WB", "WE", "WH", "WK", "NE", "SE", "UB", "B", "VB", 
+                "WF", "WJ", "WL", "WM", "WN", "WP", "WQ", "WS", "WT", "WW"
+            ]
+        };
+
+        // --- INICJALIZACJA UI ---
+        const radioContainer = document.getElementById('radio-container');
+        
+        function initRadioButtons() {
+            let html = '';
+
+            // 1. Opcja Random (zawsze pierwsza)
+            html += createRadioHTML('RANDOM', 'Losowa (Automat)', true);
+
+            // 2. Opcje z bazy JSON
+            for (const [key, desc] of Object.entries(seriesData.descriptions)) {
+                html += createRadioHTML(key, `${key} - ${desc}`);
+            }
+
+            // 3. Opcja Własna (zawsze ostatnia)
+            html += createRadioHTML('CUSTOM', 'Własna (Wpisz ręcznie)');
+            
+            // 4. Kontener na input dla opcji własnej
+            html += `
+                <div id="custom-input-container">
+                    <input type="text" id="customInput" maxlength="2" placeholder="NP. XY">
+                </div>
+            `;
+
+            radioContainer.innerHTML = html;
+
+            // Dodaj nasłuchiwanie zmian, aby pokazać/ukryć input
+            const radios = document.getElementsByName('seriesSelection');
+            radios.forEach(radio => {
+                radio.addEventListener('change', toggleCustomInput);
+            });
+
+            // Obsługa wpisywania w polu custom (tylko litery)
+            const customInput = document.getElementById('customInput');
+            customInput.addEventListener('input', function(e) {
+                 e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g, '');
+                 document.getElementById('status-message').innerText = "";
+            });
+        }
+
+        function createRadioHTML(value, label, checked = false) {
+            const isChecked = checked ? 'checked' : '';
+            return `
+                <div class="radio-option">
+                    <input type="radio" name="seriesSelection" id="opt_${value}" value="${value}" ${isChecked}>
+                    <label class="radio-label" for="opt_${value}">${label}</label>
+                </div>
+            `;
+        }
+
+        function toggleCustomInput() {
+            const selected = document.querySelector('input[name="seriesSelection"]:checked').value;
+            const customContainer = document.getElementById('custom-input-container');
+            
+            if (selected === 'CUSTOM') {
+                customContainer.classList.add('visible');
+                document.getElementById('customInput').focus();
+            } else {
+                customContainer.classList.remove('visible');
+                document.getElementById('status-message').innerText = ""; // Czyść błędy przy zmianie
+            }
+        }
+
+        // --- LOGIKA GENEROWANIA ---
+
+        function isBlocked(series) {
+            return seriesData.blocked.includes(series);
+        }
+
+        function getSafeRandomSeries() {
+            const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            let safeSeries = "";
+            let attempts = 0;
+            
+            do {
+                safeSeries = chars.charAt(Math.floor(Math.random() * chars.length)) + 
+                             chars.charAt(Math.floor(Math.random() * chars.length));
+                attempts++;
+                if (attempts > 1000) return "XX"; 
+            } while (isBlocked(safeSeries));
+
+            return safeSeries;
+        }
+
+        function getRandomDigits() {
+            let digits = "";
+            for (let i = 0; i < 8; i++) digits += Math.floor(Math.random() * 10);
+            return digits;
+        }
+
+        function handleGenerate() {
+            const selectedRadio = document.querySelector('input[name="seriesSelection"]:checked');
+            const selectionType = selectedRadio.value;
+            const statusMsg = document.getElementById('status-message');
+            
+            let finalSeries = "";
+
+            // LOGIKA WYBORU
+            if (selectionType === 'RANDOM') {
+                finalSeries = getSafeRandomSeries();
+                statusMsg.innerText = "";
+            } 
+            else if (selectionType === 'CUSTOM') {
+                const customVal = document.getElementById('customInput').value;
+                
+                if (customVal.length !== 2) {
+                    statusMsg.innerText = "Błąd: Seria musi mieć dokładnie 2 litery.";
+                    return;
+                }
+                if (isBlocked(customVal)) {
+                    statusMsg.innerText = `Błąd: Seria "${customVal}" jest na liście zablokowanych.`;
+                    return;
+                }
+                finalSeries = customVal;
+                statusMsg.innerText = "";
+            } 
+            else {
+                // Wybrano serię z listy predefiniowanej (np. IA)
+                finalSeries = selectionType;
+                statusMsg.innerText = "";
+            }
+
+            // Generowanie kodu
+            const fullCode = finalSeries + getRandomDigits();
+            
+            JsBarcode("#barcode", fullCode, {
+                format: "CODE128",
+                lineColor: "#000",
+                width: 3,
+                height: 100,
+                displayValue: false,
+                margin: 10
+            });
+
+            document.getElementById('human-readable').innerText = fullCode;
+        }
+
+        // Start
+        initRadioButtons();
+        // Generuj pierwszy kod automatycznie
+        handleGenerate();
+
+    </script>
+</body>
+</html>
