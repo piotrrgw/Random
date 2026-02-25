@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#ffffff" id="theme-color-meta">
-    <title>Generator Kodów v1.6</title>
+    <title>Generator Kodów v2.0</title>
 
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -168,31 +168,52 @@
             grid-column: span 2;
         }
 
-        /* Input Custom */
+        /* Input Custom Container */
         #custom-input-container {
             display: none;
-            margin-top: 10px;
+            margin-top: 15px;
             grid-column: span 2;
+            background: var(--accent-bg);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
         }
 
         #custom-input-container.visible {
             display: block;
         }
 
-        input[type="text"] {
+        .custom-controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .input-wrapper label {
+            font-size: 0.8rem;
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+
+        input[type="text"], input[type="number"] {
             width: 100%;
-            padding: 12px;
+            padding: 10px;
             font-size: 1.1rem;
             background-color: var(--input-bg);
             color: var(--text-color);
             border: 2px solid var(--border-color);
-            border-radius: 8px;
+            border-radius: 6px;
             text-align: center;
             text-transform: uppercase;
             box-sizing: border-box;
         }
         
-        input[type="text"]:focus {
+        input[type="text"]:focus, input[type="number"]:focus {
             border-color: var(--primary-color);
             outline: none;
         }
@@ -222,6 +243,7 @@
             justify-content: center;
             align-items: center;
             min-height: 110px;
+            overflow: hidden; /* Na wypadek bardzo długich kodów */
         }
 
         svg {
@@ -231,11 +253,12 @@
 
         #human-readable {
             font-family: 'Courier New', monospace;
-            font-size: 1.5rem;
+            font-size: 1.4rem;
             font-weight: 700;
-            letter-spacing: 2px;
+            letter-spacing: 1px;
             margin-bottom: 1.5rem;
             color: var(--text-color);
+            word-break: break-all; /* Łamanie długich kodów */
         }
 
         button.primary-btn {
@@ -262,12 +285,12 @@
     height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <main class="container">
         <header>
-            <h1>Generator v1.6</h1>
+            <h1>Generator v2.0</h1>
             <button class="theme-toggle" id="themeBtn" aria-label="Przełącz tryb ciemny">🌓</button>
         </header>
 
         <fieldset>
-            <legend>Wybierz serię:</legend>
+            <legend>Wybierz serię biletu:</legend>
             <div id="radio-container">
                 </div>
         </fieldset>
@@ -286,10 +309,9 @@
     </main>
 
     <script>
-        // Version: 1.6
+        // Version: 2.0
         
         // --- DANE ---
-        // Tutaj możesz wpisywać w dowolnej kolejności, kod sam posortuje.
         const seriesData = {
             "descriptions": {
                 "IA": "ŁKA",
@@ -310,6 +332,7 @@
         const STORAGE_KEY_THEME = 'barcode_app_theme';
         const STORAGE_KEY_SERIES = 'barcode_app_series';
         const STORAGE_KEY_CUSTOM = 'barcode_app_custom_val';
+        const STORAGE_KEY_DIGITS = 'barcode_app_digits_val'; // Nowy klucz
 
         function loadPreferences() {
             // Motyw
@@ -338,6 +361,12 @@
             const savedCustom = localStorage.getItem(STORAGE_KEY_CUSTOM);
             if (savedCustom) {
                 document.getElementById('customInput').value = savedCustom;
+            }
+
+            // Ostatnia ilość cyfr
+            const savedDigits = localStorage.getItem(STORAGE_KEY_DIGITS);
+            if (savedDigits) {
+                document.getElementById('digitsInput').value = savedDigits;
             }
         }
 
@@ -375,27 +404,38 @@
         function initRadioButtons() {
             let html = '';
             
-            // 1. Opcja Losowa (Zawsze pierwsza)
+            // 1. Opcja Losowa
             html += createRadioHTML('RANDOM', '🎲 Losowa (Automat)', false, true);
 
-            // 2. Opcje z bazy - AUTOMATYCZNE SORTOWANIE ALFABETYCZNE
-            // Konwertujemy obiekt na tablicę i sortujemy po kluczu (a[0])
+            // 2. Opcje z bazy - SORTOWANIE ALFABETYCZNE
             const sortedEntries = Object.entries(seriesData.descriptions).sort((a, b) => {
-                return a[0].localeCompare(b[0]); // Sortowanie A-Z po kodzie serii
+                return a[0].localeCompare(b[0]);
             });
 
             for (const [key, desc] of sortedEntries) {
                 html += createRadioHTML(key, `<b>${key}</b><br><small>${desc}</small>`);
             }
 
-            // 3. Opcja Własna (Zawsze ostatnia)
+            // 3. Opcja Własna
             html += createRadioHTML('CUSTOM', '✏️ Własna seria', false, true);
             
             radioContainer.innerHTML = html;
             
+            // 4. Kontener dla Własnej Serii i Cyfr
             const inputContainer = document.createElement('div');
             inputContainer.id = 'custom-input-container';
-            inputContainer.innerHTML = '<input type="text" id="customInput" maxlength="2" placeholder="Wpisz np. XY">';
+            inputContainer.innerHTML = `
+                <div class="custom-controls">
+                    <div class="input-wrapper">
+                        <label for="customInput">Seria (1-2 litery):</label>
+                        <input type="text" id="customInput" maxlength="2" placeholder="np. A">
+                    </div>
+                    <div class="input-wrapper">
+                        <label for="digitsInput">Ilość cyfr:</label>
+                        <input type="number" id="digitsInput" value="8" min="4" max="20">
+                    </div>
+                </div>
+            `;
             radioContainer.appendChild(inputContainer);
 
             // Listenery
@@ -413,6 +453,12 @@
                  e.target.value = val;
                  document.getElementById('status-message').innerText = "";
                  savePreference(STORAGE_KEY_CUSTOM, val);
+            });
+
+            // Listener dla ilości cyfr
+            const digitsInput = document.getElementById('digitsInput');
+            digitsInput.addEventListener('input', function(e) {
+                 savePreference(STORAGE_KEY_DIGITS, e.target.value);
             });
         }
 
@@ -461,9 +507,9 @@
             return safeSeries;
         }
 
-        function getRandomDigits() {
+        function getRandomDigits(count) {
             let digits = "";
-            for (let i = 0; i < 8; i++) digits += Math.floor(Math.random() * 10);
+            for (let i = 0; i < count; i++) digits += Math.floor(Math.random() * 10);
             return digits;
         }
 
@@ -473,6 +519,7 @@
             const statusMsg = document.getElementById('status-message');
             
             let finalSeries = "";
+            let digitsCount = 8; // Domyślnie 8 dla wszystkich poza Custom
 
             if (selectionType === 'RANDOM') {
                 finalSeries = getSafeRandomSeries();
@@ -480,15 +527,21 @@
             } 
             else if (selectionType === 'CUSTOM') {
                 const customVal = document.getElementById('customInput').value;
-                if (customVal.length !== 2) {
-                    statusMsg.innerText = "Wpisz dokładnie 2 litery.";
+                // Pobieramy ilość cyfr, fallback do 8 jeśli puste
+                const customDigits = parseInt(document.getElementById('digitsInput').value) || 8;
+                
+                // Walidacja serii (1 lub 2 znaki)
+                if (customVal.length < 1) {
+                    statusMsg.innerText = "Wpisz co najmniej 1 literę.";
                     return;
                 }
                 if (isBlocked(customVal)) {
                     statusMsg.innerText = "Ta seria jest zablokowana.";
                     return;
                 }
+                
                 finalSeries = customVal;
+                digitsCount = customDigits;
                 statusMsg.innerText = "";
             } 
             else {
@@ -496,12 +549,12 @@
                 statusMsg.innerText = "";
             }
 
-            const fullCode = finalSeries + getRandomDigits();
+            const fullCode = finalSeries + getRandomDigits(digitsCount);
             
             JsBarcode("#barcode", fullCode, {
                 format: "CODE128",
                 lineColor: "#000",
-                width: 3,
+                width: 2, // Zmniejszyłem nieco szerokość paska, żeby długie kody weszły
                 height: 80,
                 displayValue: false,
                 margin: 5
