@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#ffffff" id="theme-color-meta">
-    <title>Generator Kodów v2.0</title>
+    <title>Generator Kodów v2.1</title>
 
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -113,11 +113,25 @@
             opacity: 0.8;
         }
 
-        /* Grid */
-        #radio-container {
+        /* --- STYLIZACJA GRUP --- */
+        .group-header {
+            width: 100%;
+            font-weight: 700;
+            margin: 1.2rem 0 0.6rem 0;
+            color: var(--primary-color);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 4px;
+            text-align: left;
+        }
+
+        .group-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 10px;
+            width: 100%;
         }
 
         .radio-option {
@@ -172,7 +186,6 @@
         #custom-input-container {
             display: none;
             margin-top: 15px;
-            grid-column: span 2;
             background: var(--accent-bg);
             padding: 15px;
             border-radius: 8px;
@@ -243,7 +256,7 @@
             justify-content: center;
             align-items: center;
             min-height: 110px;
-            overflow: hidden; /* Na wypadek bardzo długich kodów */
+            overflow: hidden;
         }
 
         svg {
@@ -258,7 +271,7 @@
             letter-spacing: 1px;
             margin-bottom: 1.5rem;
             color: var(--text-color);
-            word-break: break-all; /* Łamanie długich kodów */
+            word-break: break-all;
         }
 
         button.primary-btn {
@@ -285,14 +298,27 @@
     height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <main class="container">
         <header>
-            <h1>Generator v2.0</h1>
+            <h1>Generator v2.1</h1>
             <button class="theme-toggle" id="themeBtn" aria-label="Przełącz tryb ciemny">🌓</button>
         </header>
 
         <fieldset>
-            <legend>Wybierz serię:</legend>
+            <legend>Wybierz serię biletu:</legend>
             <div id="radio-container">
                 </div>
+            
+            <div id="custom-input-container">
+                <div class="custom-controls">
+                    <div class="input-wrapper">
+                        <label for="customInput">Seria (1-2 litery):</label>
+                        <input type="text" id="customInput" maxlength="2" placeholder="np. A">
+                    </div>
+                    <div class="input-wrapper">
+                        <label for="digitsInput">Ilość cyfr:</label>
+                        <input type="number" id="digitsInput" value="8" min="4" max="20">
+                    </div>
+                </div>
+            </div>
         </fieldset>
 
         <div id="result-area">
@@ -309,19 +335,34 @@
     </main>
 
     <script>
-        // Version: 2.0
+        // Version: 2.1
         
-        // --- DANE ---
+        // --- DANE (Pogrupowane na przewoźników) ---
         const seriesData = {
-            "descriptions": {
-                "IA": "ŁKA",
-                "AS": "KŚ Jednoraz.",
-                "EE": "KŚ Okres.",
-                "JA": "KMŁ Jednoraz.",
-                "DZ": "SKM 3M",
-                "CA": "KM",
-                "ZZ": "IC Test",
-                "UA": "PR",
+            "grouped": {
+                "Koleje Śląskie (KŚ)": {
+                    "AS": "Jednoraz.",
+                    "EE": "Okres.",
+                    "EB": "Jednoraz.",
+                },
+                "Łódzka Kolej Aglomeracyjna (ŁKA)": {
+                    "IA": "Jednoraz."
+                },
+                "Koleje Małopolskie (KMŁ)": {
+                    "JA": "Jednoraz."
+                },
+                "Koleje Mazowieckie (KM)": {
+                    "CA": "Jednoraz."
+                },
+                "SKM Trójmiasto": {
+                    "DZ": "Jednoraz"
+                },
+                "Polregio": {
+                    "UA": "Jednoraz."
+                },
+                "PKP Intercity": {
+                    "ZZ": "IC Test"
+                }
             },
             "blocked": [
                 "DB", "WB", "WE", "WH", "WK", "NE", "SE", "UB", "B", "VB",
@@ -333,7 +374,7 @@
         const STORAGE_KEY_THEME = 'barcode_app_theme';
         const STORAGE_KEY_SERIES = 'barcode_app_series';
         const STORAGE_KEY_CUSTOM = 'barcode_app_custom_val';
-        const STORAGE_KEY_DIGITS = 'barcode_app_digits_val'; // Nowy klucz
+        const STORAGE_KEY_DIGITS = 'barcode_app_digits_val';
 
         function loadPreferences() {
             // Motyw
@@ -355,7 +396,8 @@
                     }
                 }
             } else {
-                document.getElementById('opt_RANDOM').checked = true;
+                const randomOpt = document.getElementById('opt_RANDOM');
+                if(randomOpt) randomOpt.checked = true;
             }
 
             // Ostatnia wartość pola custom
@@ -405,39 +447,36 @@
         function initRadioButtons() {
             let html = '';
             
-            // 1. Opcja Losowa
+            // 1. Opcja Losowa (Zawsze na górze)
+            html += `<div class="group-grid" style="margin-bottom: 1rem;">`;
             html += createRadioHTML('RANDOM', '🎲 Losowa (Automat)', false, true);
+            html += `</div>`;
 
-            // 2. Opcje z bazy - SORTOWANIE ALFABETYCZNE
-            const sortedEntries = Object.entries(seriesData.descriptions).sort((a, b) => {
-                return a[0].localeCompare(b[0]);
-            });
+            // 2. Grupy z bazy - SORTOWANIE ALFABETYCZNE GRUP
+            const sortedGroups = Object.keys(seriesData.grouped).sort((a, b) => a.localeCompare(b));
 
-            for (const [key, desc] of sortedEntries) {
-                html += createRadioHTML(key, `<b>${key}</b><br><small>${desc}</small>`);
+            for (const groupName of sortedGroups) {
+                html += `<div class="group-header">${groupName}</div>`;
+                html += `<div class="group-grid">`;
+                
+                // Sortowanie opcji wewnątrz grupy
+                const options = seriesData.grouped[groupName];
+                const sortedOptions = Object.entries(options).sort((a, b) => a[0].localeCompare(b[0]));
+                
+                for (const [key, desc] of sortedOptions) {
+                    html += createRadioHTML(key, `<b>${key}</b><br><small>${desc}</small>`);
+                }
+                
+                html += `</div>`;
             }
 
-            // 3. Opcja Własna
+            // 3. Opcja Własna (Zawsze na dole)
+            html += `<div class="group-header">Inne</div>`;
+            html += `<div class="group-grid">`;
             html += createRadioHTML('CUSTOM', '✏️ Własna seria', false, true);
+            html += `</div>`;
             
             radioContainer.innerHTML = html;
-            
-            // 4. Kontener dla Własnej Serii i Cyfr
-            const inputContainer = document.createElement('div');
-            inputContainer.id = 'custom-input-container';
-            inputContainer.innerHTML = `
-                <div class="custom-controls">
-                    <div class="input-wrapper">
-                        <label for="customInput">Seria (1-2 litery):</label>
-                        <input type="text" id="customInput" maxlength="2" placeholder="np. A">
-                    </div>
-                    <div class="input-wrapper">
-                        <label for="digitsInput">Ilość cyfr:</label>
-                        <input type="number" id="digitsInput" value="8" min="4" max="20">
-                    </div>
-                </div>
-            `;
-            radioContainer.appendChild(inputContainer);
 
             // Listenery
             const radios = document.getElementsByName('seriesSelection');
@@ -456,7 +495,6 @@
                  savePreference(STORAGE_KEY_CUSTOM, val);
             });
 
-            // Listener dla ilości cyfr
             const digitsInput = document.getElementById('digitsInput');
             digitsInput.addEventListener('input', function(e) {
                  savePreference(STORAGE_KEY_DIGITS, e.target.value);
@@ -520,7 +558,7 @@
             const statusMsg = document.getElementById('status-message');
             
             let finalSeries = "";
-            let digitsCount = 8; // Domyślnie 8 dla wszystkich poza Custom
+            let digitsCount = 8; 
 
             if (selectionType === 'RANDOM') {
                 finalSeries = getSafeRandomSeries();
@@ -528,10 +566,8 @@
             } 
             else if (selectionType === 'CUSTOM') {
                 const customVal = document.getElementById('customInput').value;
-                // Pobieramy ilość cyfr, fallback do 8 jeśli puste
                 const customDigits = parseInt(document.getElementById('digitsInput').value) || 8;
                 
-                // Walidacja serii (1 lub 2 znaki)
                 if (customVal.length < 1) {
                     statusMsg.innerText = "Wpisz co najmniej 1 literę.";
                     return;
@@ -555,7 +591,7 @@
             JsBarcode("#barcode", fullCode, {
                 format: "CODE128",
                 lineColor: "#000",
-                width: 2, // Zmniejszyłem nieco szerokość paska, żeby długie kody weszły
+                width: 2, 
                 height: 80,
                 displayValue: false,
                 margin: 5
