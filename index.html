@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#ffffff" id="theme-color-meta">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192x192.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <title>Generator Kodów v2.1</title>
 
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
@@ -608,5 +612,20 @@
         handleGenerate();
 
     </script>
+    <script>
+        // Rejestracja Service Workera
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker został pomyślnie zarejestrowany (Scope: ', registration.scope, ')');
+                    })
+                    .catch(error => {
+                        console.error('Błąd rejestracji ServiceWorkera:', error);
+                    });
+            });
+        }
+    </script>
 </body>
+
 </html>
