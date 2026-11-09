@@ -8,7 +8,7 @@
     <link rel="apple-touch-icon" href="icon-192x192.png">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>Generator Kodów v2.1</title>
+    <title>Generator Kodów v2.2</title>
 
     <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
     new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -302,7 +302,7 @@
     height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <main class="container">
         <header>
-            <h1>Generator v2.1</h1>
+            <h1>Generator v2.2</h1>
             <button class="theme-toggle" id="themeBtn" aria-label="Przełącz tryb ciemny">🌓</button>
         </header>
 
@@ -314,12 +314,8 @@
             <div id="custom-input-container">
                 <div class="custom-controls">
                     <div class="input-wrapper">
-                        <label for="customInput">Seria (1-2 litery):</label>
-                        <input type="text" id="customInput" maxlength="2" placeholder="np. A">
-                    </div>
-                    <div class="input-wrapper">
-                        <label for="digitsInput">Ilość cyfr:</label>
-                        <input type="number" id="digitsInput" value="8" min="4" max="20">
+                        <label for="customInput">Seria (2 litery):</label>
+                        <input type="text" id="customInput" maxlength="2" placeholder="np. AT">
                     </div>
                 </div>
             </div>
@@ -339,7 +335,7 @@
     </main>
 
     <script>
-        // Version: 2.1
+        // Version: 2.2
         
         // --- DANE (Pogrupowane na przewoźników) ---
         const seriesData = {
@@ -352,7 +348,7 @@
                 "Łódzka Kolej Aglomeracyjna (ŁKA)": {
                     "IA": "Jednoraz."
                 },
-                "Koleje Wilkopolskie (KW)": {
+                "Koleje Wielkopolskie (KW)": {
                     "AD": "Jednoraz."
                 },
                 "Koleje Małopolskie (KMŁ)": {
@@ -362,15 +358,17 @@
                     "CA": "Jednoraz.",
                     "CB": "Jednoraz.",
                     "CC": "Jednoraz.",
+                    "CS": "Jednoraz.",
                 },
                 "SKM Trójmiasto": {
-                    "DZ": "Jednoraz"
+                    "DZ": "Jednoraz."
                 },
                 "Polregio": {
                     "UA": "Jednoraz.",
                     "TD": "Terminal Kond."
                 },
                 "PKP Intercity": {
+                    "AT": "Kasa Biletowa",
                     "ZZ": "IC Test"
                 }
             },
@@ -418,8 +416,9 @@
 
             // Ostatnia ilość cyfr
             const savedDigits = localStorage.getItem(STORAGE_KEY_DIGITS);
-            if (savedDigits) {
-                document.getElementById('digitsInput').value = savedDigits;
+            const digitsEl = document.getElementById('digitsInput');
+            if (savedDigits && digitsEl) {
+                digitsEl.value = savedDigits;
             }
         }
 
@@ -506,9 +505,11 @@
             });
 
             const digitsInput = document.getElementById('digitsInput');
-            digitsInput.addEventListener('input', function(e) {
-                 savePreference(STORAGE_KEY_DIGITS, e.target.value);
-            });
+            if (digitsInput) {
+                digitsInput.addEventListener('input', function(e) {
+                     savePreference(STORAGE_KEY_DIGITS, e.target.value);
+                });
+            }
         }
 
         function createRadioHTML(value, labelContent, checked = false, fullWidth = false) {
@@ -562,24 +563,29 @@
             return digits;
         }
 
+        function calculateCheckDigit(digitsStr) {
+            // Algorytm Modulo 7 (standard biletowy kolejowy, m.in. PKP Intercity, KURS, EPA)
+            // Zgodnie z fizycznym blankietem biletowym (np. AT004308927 (0) -> 4308927 % 7 = 0)
+            const num = parseInt(digitsStr, 10);
+            return num % 7;
+        }
+
         function handleGenerate() {
             const selectedRadio = document.querySelector('input[name="seriesSelection"]:checked');
             const selectionType = selectedRadio ? selectedRadio.value : 'RANDOM';
             const statusMsg = document.getElementById('status-message');
             
             let finalSeries = "";
-            let digitsCount = 8; 
 
             if (selectionType === 'RANDOM') {
                 finalSeries = getSafeRandomSeries();
                 statusMsg.innerText = "";
             } 
             else if (selectionType === 'CUSTOM') {
-                const customVal = document.getElementById('customInput').value;
-                const customDigits = parseInt(document.getElementById('digitsInput').value) || 8;
+                const customVal = document.getElementById('customInput').value.trim();
                 
-                if (customVal.length < 1) {
-                    statusMsg.innerText = "Wpisz co najmniej 1 literę.";
+                if (customVal.length !== 2) {
+                    statusMsg.innerText = "Wpisz dokładnie 2 litery serii.";
                     return;
                 }
                 if (isBlocked(customVal)) {
@@ -588,7 +594,6 @@
                 }
                 
                 finalSeries = customVal;
-                digitsCount = customDigits;
                 statusMsg.innerText = "";
             } 
             else {
@@ -596,9 +601,16 @@
                 statusMsg.innerText = "";
             }
 
-            const fullCode = finalSeries + getRandomDigits(digitsCount);
+            // 9 cyfr oraz cyfra kontrolna w nawiasie (x)
+            const digits = getRandomDigits(9);
+            const checkDigit = calculateCheckDigit(digits);
             
-            JsBarcode("#barcode", fullCode, {
+            // Format kodu kreskowego (Code 128 - koduje serię, 9 cyfr oraz cyfrę kontrolną w nawiasie)
+            const barcodeData = `${finalSeries}${digits}(${checkDigit})`;
+            // Format czytelny dla człowieka (zgodny ze wzorem blankietu: AT004308927 (0))
+            const humanReadable = `${finalSeries}${digits} (${checkDigit})`;
+            
+            JsBarcode("#barcode", barcodeData, {
                 format: "CODE128",
                 lineColor: "#000",
                 width: 2, 
@@ -607,7 +619,7 @@
                 margin: 5
             });
 
-            document.getElementById('human-readable').innerText = fullCode;
+            document.getElementById('human-readable').innerText = humanReadable;
         }
 
         // Start
